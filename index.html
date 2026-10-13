@@ -1,0 +1,1436 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SIMPACE Smart Ingestion & Interactive E-Book Studio</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Thư viện Mozilla PDF.js chạy 100% Client-side -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <!-- Thư viện Docx.js xuất Microsoft Word trực tiếp từ trình duyệt -->
+  <script src="https://unpkg.com/docx@9.7.1/build/index.js"></script>
+  <style>
+    .drag-active {
+      border-color: #4f46e5 !important;
+      background-color: #eef2ff !important;
+    }
+    /* Chế độ màu giấy E-Book */
+    .ebook-theme-white {
+      background-color: #ffffff;
+      color: #1e293b;
+      border-color: #e2e8f0;
+    }
+    .ebook-theme-sepia {
+      background-color: #fcf6ea !important;
+      color: #3b2f1e !important;
+      border-color: #ebd9be !important;
+    }
+    .ebook-theme-sepia .ebook-card {
+      background-color: #f7eedb !important;
+      border-color: #e5d1b1 !important;
+      color: #3b2f1e !important;
+    }
+    .ebook-theme-dark {
+      background-color: #18181b !important;
+      color: #e4e4e7 !important;
+      border-color: #27272a !important;
+    }
+    .ebook-theme-dark .ebook-card {
+      background-color: #27272a !important;
+      border-color: #3f3f46 !important;
+      color: #f4f4f5 !important;
+    }
+    /* Gáy sách ở giữa */
+    .book-spine-shadow {
+      box-shadow: inset 18px 0 25px -10px rgba(0, 0, 0, 0.08), inset -18px 0 25px -10px rgba(0, 0, 0, 0.08);
+    }
+    /* Hiệu ứng Highlight */
+    .highlight-active::selection {
+      background-color: #fef08a !important;
+      color: #713f12 !important;
+    }
+    .highlighted-mark {
+      background-color: #fef08a;
+      color: #713f12;
+      border-radius: 2px;
+      padding: 0 2px;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans min-h-screen flex flex-col">
+
+  <!-- HEADER -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-md">
+          <i class="fa-solid fa-book-bookmark"></i>
+        </div>
+        <div>
+          <h1 class="font-bold text-slate-900 leading-tight flex items-center gap-2">
+            SIMPACE E-BOOK AI STUDIO
+            <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 border border-indigo-200">PORT 3002</span>
+          </h1>
+          <p class="text-xs text-indigo-600 font-medium">Bóc Tách Toàn Bộ Sách & Visualize Thành Cuốn E-Book Tương Tác</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          Groq 120B LPU: Cực Nhanh (0% 503)
+        </span>
+        <a href="http://localhost:3000" class="text-xs font-semibold text-slate-500 hover:text-indigo-600 flex items-center gap-1 border-l pl-3 border-slate-200">
+          <i class="fa-solid fa-arrow-left"></i> Về LMS (3000)
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 flex flex-col gap-6">
+
+    <!-- BƯỚC 1: DROPZONE TẢI LÊN FILE SÁCH PDF -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
+        <div>
+          <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
+            <i class="fa-solid fa-file-pdf text-red-600"></i>
+            Tải Lên File Sách Bài Tập Hoặc Đề Thi PDF (Toàn Bộ Cuốn Sách)
+          </h2>
+          <p class="text-xs text-slate-500 mt-0.5">
+            Bóc tách tất cả các bài trong sách, tự động gom ảnh sơ đồ và chuyển hóa thành <b>E-Book số hóa 2 trang mở</b> thao tác được như sách thật.
+          </p>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-bold px-2.5 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg">
+            Multi-Section + E-Book Visualizer
+          </span>
+        </div>
+      </div>
+
+      <!-- VÙNG KÉO THẢ FILE -->
+      <div id="drop-area" class="border-2 border-dashed border-indigo-200 hover:border-indigo-500 bg-indigo-50/20 hover:bg-indigo-50/50 rounded-2xl p-6 text-center transition cursor-pointer" onclick="document.getElementById('file-input').click()">
+        <input type="file" id="file-input" accept=".pdf" class="hidden" onchange="handleFileSelected(event)">
+        <div class="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center mx-auto text-xl mb-2 shadow-sm">
+          <i class="fa-solid fa-cloud-arrow-up"></i>
+        </div>
+        <p class="text-sm font-bold text-slate-800">Nhấp chuột để chọn file PDF hoặc kéo thả vào đây</p>
+        <p class="text-xs text-slate-400 mt-1">Đã hỗ trợ bóc tách trọn vẹn cả quyển sách nhiều bài (Cambridge IELTS, Mindset, Road to IELTS)</p>
+      </div>
+
+      <!-- THANH CẤU HÌNH KHOẢNG TRANG -->
+      <div id="chunk-config-bar" class="mt-4 p-4 bg-indigo-50/40 border border-indigo-100 rounded-xl hidden flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 bg-red-100 text-red-600 rounded-lg flex items-center justify-center font-bold text-sm">
+            <i class="fa-solid fa-file-lines"></i>
+          </div>
+          <div>
+            <div id="loaded-file-name" class="font-bold text-slate-900 text-xs">file_name.pdf</div>
+            <div id="loaded-file-pages" class="text-[11px] text-slate-500 font-semibold">Tổng số: 0 trang</div>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <span class="text-xs font-semibold text-slate-600">Phạm vi trang:</span>
+          <div class="flex items-center gap-1.5 text-xs">
+            <span>Từ:</span>
+            <input type="number" id="page-start" min="1" value="1" class="w-14 px-2 py-1 bg-white border border-slate-300 rounded-lg text-center font-bold">
+            <span>Đến:</span>
+            <input type="number" id="page-end" min="1" value="1" class="w-14 px-2 py-1 bg-white border border-slate-300 rounded-lg text-center font-bold">
+          </div>
+          <button onclick="setAllPagesScope()" class="px-2.5 py-1 text-[11px] bg-slate-200 hover:bg-slate-300 rounded-lg font-bold text-slate-700 transition">
+            Chọn hết
+          </button>
+          <button onclick="startProcessing()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition shadow flex items-center gap-2">
+            <i class="fa-solid fa-play"></i>
+            Bóc Tách & Mở E-Book
+          </button>
+        </div>
+      </div>
+
+      <!-- CÁC NÚT THỬ NGHIỆM ĐỀ MẪU -->
+      <div class="mt-4 pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs">
+        <span class="text-slate-500 font-medium">Chưa có file PDF sẵn? Mở thử nghiệm ngay với E-Book mẫu:</span>
+        <div class="flex gap-2">
+          <button onclick="loadSampleIeltsMulti()" class="px-3.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-xl transition border border-indigo-200 flex items-center gap-1.5 shadow-sm">
+            <i class="fa-solid fa-book-open text-indigo-600"></i>
+            Mẫu 1: Cambridge 18 Reading (3 Passage Đầy Đủ)
+          </button>
+          <button onclick="loadSampleGrammar()" class="px-3.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold rounded-xl transition border border-amber-200 flex items-center gap-1.5">
+            <i class="fa-solid fa-list-check text-amber-600"></i>
+            Mẫu 2: Ngữ Pháp (Unit 1 & Unit 2)
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- KHU VỰC TIẾN TRÌNH XỬ LÝ -->
+    <div id="processing-box" class="bg-white rounded-2xl border border-indigo-200 p-6 shadow-sm hidden">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="w-6 h-6 border-3 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+        <span id="progress-status" class="text-xs font-bold text-indigo-900">Đang khởi tạo trình xử lý PDF...</span>
+      </div>
+      <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+        <div id="progress-bar-fill" class="bg-indigo-600 h-2 rounded-full transition-all duration-300" style="width: 15%"></div>
+      </div>
+    </div>
+
+    <!-- KHU VỰC THƯ VIỆN HÌNH ẢNH SƠ ĐỒ ĐÃ BÓC TÁCH -->
+    <div id="image-gallery-box" class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hidden">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-xs font-bold text-slate-800 flex items-center gap-2">
+          <i class="fa-solid fa-images text-indigo-600"></i>
+          Hình Ảnh & Sơ Đồ Bóc Tách Được Từ PDF (<span id="extracted-images-count">0</span> ảnh)
+        </h3>
+        <span class="text-[11px] text-slate-400">Trích xuất độc lập từ vector PDF</span>
+      </div>
+      <div id="extracted-images-container" class="flex gap-3 overflow-x-auto pb-2"></div>
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- THANH CHUYỂN ĐỔI CHẾ ĐỘ XEM (VIEW MODE SWITCHER)               -->
+    <!-- ============================================================== -->
+    <div id="view-mode-bar" class="bg-white rounded-2xl border border-slate-200 p-2 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3 hidden">
+      <div class="flex items-center gap-2 w-full sm:w-auto">
+        <button id="btn-mode-ebook" onclick="switchViewMode('ebook')" class="flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 bg-indigo-600 text-white shadow">
+          <i class="fa-solid fa-book-open-reader"></i>
+          1. E-Book Tương Tác (Học Viên Luyện Đề)
+        </button>
+        <button id="btn-mode-studio" onclick="switchViewMode('studio')" class="flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 bg-slate-100 text-slate-700 hover:bg-slate-200">
+          <i class="fa-solid fa-chalkboard-user text-indigo-600"></i>
+          2. Studio Quản Trị (Giáo Viên Giao Bài)
+        </button>
+      </div>
+
+      <!-- ĐIỀU KHIỂN RIÊNG CHO E-BOOK: MÀU GIẤY & CỠ CHỮ -->
+      <div id="ebook-quick-controls" class="flex items-center gap-3 text-xs">
+        <!-- Đổi Theme Giấy -->
+        <div class="flex items-center bg-slate-100 p-1 rounded-xl gap-1">
+          <button onclick="setEbookTheme('white')" id="theme-btn-white" title="Giấy Trắng" class="w-6 h-6 rounded-lg bg-white border border-slate-300 shadow-sm flex items-center justify-center text-[10px]"><i class="fa-solid fa-sun text-amber-500"></i></button>
+          <button onclick="setEbookTheme('sepia')" id="theme-btn-sepia" title="Giấy Ngà Ấm (Sepia - Chuẩn Kindle)" class="w-6 h-6 rounded-lg bg-[#fcf6ea] border border-[#ebd9be] flex items-center justify-center text-[10px]"><i class="fa-solid fa-feather text-amber-800"></i></button>
+          <button onclick="setEbookTheme('dark')" id="theme-btn-dark" title="Đêm Tối" class="w-6 h-6 rounded-lg bg-zinc-800 border border-zinc-700 flex items-center justify-center text-[10px] text-zinc-300"><i class="fa-solid fa-moon"></i></button>
+        </div>
+        <!-- Cỡ chữ -->
+        <div class="flex items-center gap-1 font-bold text-slate-600">
+          <button onclick="changeFontSize(-1)" class="w-6 h-6 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center justify-center">A-</button>
+          <button onclick="changeFontSize(1)" class="w-6 h-6 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center justify-center">A+</button>
+        </div>
+        <!-- Bút Dạ Quang Highlight -->
+        <button onclick="toggleHighlighter()" id="btn-highlighter" class="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl font-bold flex items-center gap-1.5 transition">
+          <i class="fa-solid fa-highlighter"></i> Bút Highlight
+        </button>
+      </div>
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- GIAO DIỆN 1: CUỐN E-BOOK 2 TRANG MỞ TƯƠNG TÁC (DIGITAL E-BOOK)   -->
+    <!-- ============================================================== -->
+    <div id="ebook-container" class="flex flex-col gap-4 hidden">
+
+      <!-- THANH MỤC LỤC & ĐIỀU HƯỚNG TRANG SÁCH -->
+      <div class="flex items-center justify-between text-xs px-2">
+        <div class="flex items-center gap-2">
+          <button onclick="toggleTocDrawer()" class="px-3 py-1.5 bg-white border border-slate-200 rounded-xl font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-1.5 shadow-sm">
+            <i class="fa-solid fa-bars text-indigo-600"></i> Mục Lục Sách (<span id="toc-section-count">3</span> Bài)
+          </button>
+          <span id="ebook-book-title-badge" class="font-bold text-slate-600 hidden sm:inline">Cambridge IELTS 18 Academic</span>
+        </div>
+
+        <div class="flex items-center gap-2 font-bold">
+          <button onclick="prevEbookSection()" id="btn-prev-page" class="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl shadow-sm flex items-center gap-1">
+            <i class="fa-solid fa-chevron-left"></i> Bài Trước
+          </button>
+          <span id="ebook-page-counter" class="px-3 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-xl">Bài 1 / 3</span>
+          <button onclick="nextEbookSection()" id="btn-next-page" class="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl shadow-sm flex items-center gap-1">
+            Bài Tiếp <i class="fa-solid fa-chevron-right"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- CUỐN SÁCH MỞ 2 TRANG (OPEN BOOK SPREAD) -->
+      <div id="ebook-spread" class="ebook-theme-white rounded-3xl border border-slate-300 shadow-2xl overflow-hidden grid grid-cols-1 lg:grid-cols-2 min-h-[640px] relative transition-colors duration-300">
+        
+        <!-- TRANG TRÁI (LEFT PAGE): BÀI ĐỌC (READING PASSAGE) -->
+        <div class="p-6 md:p-8 flex flex-col border-b lg:border-b-0 lg:border-r border-slate-200 relative book-spine-shadow">
+          <!-- Header trang sách -->
+          <div class="flex items-center justify-between text-[11px] font-serif uppercase tracking-widest opacity-60 pb-3 border-b border-current mb-4">
+            <span id="ebook-left-running-head">SIMPACE ACADEMIC READING</span>
+            <span id="ebook-left-page-num">PAGE 1</span>
+          </div>
+
+          <!-- Tiêu đề Passage -->
+          <div class="mb-4">
+            <span id="ebook-section-badge" class="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">PASSAGE 1</span>
+            <h2 id="ebook-passage-title" class="text-xl md:text-2xl font-serif font-black mt-2 leading-tight">
+              Renewable Hydroelectric Power Plants
+            </h2>
+          </div>
+
+          <!-- Nội dung bài đọc -->
+          <div id="ebook-passage-content" class="text-sm md:text-base leading-relaxed font-serif flex-1 overflow-y-auto pr-3 whitespace-pre-line text-justify selection:bg-amber-200 selection:text-amber-900">
+            <!-- Nội dung bài đọc render ở đây -->
+          </div>
+
+          <!-- Footer trang sách trái -->
+          <div class="mt-4 pt-3 border-t border-current flex items-center justify-between text-[10px] opacity-50">
+            <span>SIMPACE IELTS E-Book Engine</span>
+            <span>Mẹo: Quét chuột bôi đen để Highlight dẫn chứng</span>
+          </div>
+        </div>
+
+        <!-- TRANG PHẢI (RIGHT PAGE): PHIẾU BÀI TẬP TƯƠNG TÁC (INTERACTIVE QUIZ SHEET) -->
+        <div class="p-6 md:p-8 flex flex-col bg-slate-50/50 ebook-card relative">
+          <!-- Header trang sách phải -->
+          <div class="flex items-center justify-between text-[11px] font-serif uppercase tracking-widest opacity-60 pb-3 border-b border-current mb-4">
+            <span>PRACTICE EXERCISES & QUIZ</span>
+            <span id="ebook-right-page-num">PAGE 2</span>
+          </div>
+
+          <!-- Thanh tiến độ trả lời câu hỏi -->
+          <div class="flex items-center justify-between mb-4">
+            <div class="text-xs font-bold flex items-center gap-1.5">
+              <i class="fa-solid fa-list-check text-indigo-600"></i>
+              Phiếu Trả Lời: <span id="ebook-quiz-counter" class="text-indigo-600">0/0 Đã Làm</span>
+            </div>
+            <!-- Bảng kết quả chấm điểm nếu đã nộp -->
+            <div id="ebook-score-pill" class="text-xs font-black px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 hidden">
+              Điểm: 0/0
+            </div>
+          </div>
+
+          <!-- Danh sách câu hỏi dạng tương tác trực tiếp -->
+          <div id="ebook-interactive-questions" class="flex-1 overflow-y-auto pr-2 flex flex-col gap-4">
+            <!-- Render câu hỏi tương tác ở đây -->
+          </div>
+
+          <!-- Nút Chấm Điểm & Nộp Bài Trực Tiếp Trên Trang Sách -->
+          <div class="mt-4 pt-3 border-t border-slate-200 flex items-center justify-between gap-3">
+            <button onclick="resetEbookAnswers()" class="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs rounded-xl transition">
+              <i class="fa-solid fa-rotate-left"></i> Làm Lại Bài Này
+            </button>
+            <button onclick="checkEbookAnswers()" class="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs rounded-xl shadow-lg transition flex items-center justify-center gap-2">
+              <i class="fa-solid fa-check-double"></i> Nộp Bài & Chấm Điểm Tức Thì
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- GIAO DIỆN 2: CHẾ ĐỘ STUDIO QUẢN TRỊ & GIAO BÀI (TEACHER VIEW)  -->
+    <!-- ============================================================== -->
+    <div id="studio-box" class="flex flex-col gap-5 hidden">
+
+      <!-- THANH ĐIỀU HƯỚNG TỪNG BÀI HỌC -->
+      <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-black text-slate-900 flex items-center gap-1.5 uppercase">
+            <i class="fa-solid fa-layer-group text-indigo-600"></i> Quản Lý Từng Bài:
+          </span>
+          <span id="badge-total-sections" class="px-2 py-0.5 bg-indigo-100 text-indigo-800 rounded-full text-[11px] font-black">3 Bài</span>
+        </div>
+        <div id="section-tabs-container" class="flex flex-wrap items-center gap-2"></div>
+      </div>
+
+      <!-- KHUNG HIỂN THỊ CHIA 2 CỘT -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- CỘT TRÁI (5 CỘT): PDF GỐC & NÚT XUẤT BẢN -->
+        <div class="lg:col-span-5 flex flex-col gap-4">
+          <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm flex flex-col">
+            <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-100">
+              <span class="text-xs font-bold text-slate-800 flex items-center gap-2">
+                <i class="fa-solid fa-eye text-indigo-600"></i> Trang Sách PDF Gốc
+              </span>
+              <div class="flex items-center gap-2 text-xs">
+                <button onclick="prevPdfPage()" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-slate-700"><i class="fa-solid fa-chevron-left"></i></button>
+                <span id="preview-page-indicator" class="font-bold text-slate-700">Trang 1</span>
+                <button onclick="nextPdfPage()" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-slate-700"><i class="fa-solid fa-chevron-right"></i></button>
+              </div>
+            </div>
+            <div class="bg-slate-100 rounded-xl overflow-hidden flex items-center justify-center min-h-[380px] p-2">
+              <canvas id="pdf-render-canvas" class="max-w-full h-auto shadow-md rounded"></canvas>
+              <img id="pdf-render-fallback-img" class="max-w-full h-auto shadow-md rounded hidden" alt="Preview">
+            </div>
+          </div>
+
+          <div class="bg-gradient-to-br from-indigo-50 to-slate-50 rounded-2xl border border-indigo-100 p-4 flex flex-col gap-2.5">
+            <div class="text-xs font-bold text-indigo-950 flex items-center gap-1.5">
+              <i class="fa-solid fa-download text-indigo-600"></i> Thao Tác Nghiệp Vụ LMS
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <button onclick="exportDocx()" class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow transition flex items-center justify-center gap-1.5">
+                <i class="fa-solid fa-file-word"></i> Xuất Word Tất Cả Bài
+              </button>
+              <button onclick="openAssignModal()" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow transition flex items-center justify-center gap-1.5">
+                <i class="fa-solid fa-paper-plane"></i> Giao Bài Tập Cho Lớp
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- CỘT PHẢI (7 CỘT): NỘI DUNG SỐ HÓA & CÂU HỎI -->
+        <div class="lg:col-span-7 flex flex-col gap-4">
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <span id="active-section-tag" class="text-[10px] font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
+                  Phần 1
+                </span>
+                <h2 id="active-section-title" class="text-base font-black text-slate-900 mt-1">Reading Passage 1</h2>
+                <p id="doc-book-title" class="text-xs text-slate-500 font-medium">Cambridge IELTS Practice Test</p>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <button onclick="toggleSelectActiveSection()" id="btn-select-section" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition">
+                  Bỏ chọn bài này
+                </button>
+              </div>
+            </div>
+
+            <div id="passage-container" class="mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                  <i class="fa-solid fa-align-left text-indigo-600"></i> Bài Đọc Chính (Reading Passage)
+                </span>
+                <button onclick="togglePassageCollapse()" id="btn-toggle-passage" class="text-xs text-indigo-600 font-bold hover:underline">Thu gọn</button>
+              </div>
+              <div id="passage-text" class="text-xs text-slate-700 leading-relaxed font-serif max-h-48 overflow-y-auto pr-2 whitespace-pre-line"></div>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm flex flex-col gap-3">
+            <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+              <div class="text-xs font-bold text-slate-900 flex items-center gap-2">
+                <i class="fa-solid fa-circle-question text-indigo-600"></i>
+                Danh Sách Câu Hỏi Của Bài
+                <span class="px-2 py-0.5 bg-indigo-100 text-indigo-800 rounded-full text-[11px] font-black">
+                  <span id="selected-counter">0</span> / <span id="total-counter">0</span> Câu Đã Chọn
+                </span>
+              </div>
+              <span class="text-[11px] text-slate-400">Tick chọn câu hỏi để giao bài</span>
+            </div>
+            <div id="questions-container" class="flex flex-col gap-3 max-h-[500px] overflow-y-auto pr-1"></div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- DRAWER MỤC LỤC E-BOOK (TOC MODAL/DRAWER) -->
+  <div id="toc-drawer" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex hidden">
+    <div class="bg-white w-80 max-w-full h-full p-6 shadow-2xl flex flex-col gap-4">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <h3 class="text-sm font-black text-slate-900 flex items-center gap-2">
+          <i class="fa-solid fa-book-bookmark text-indigo-600"></i> Mục Lục Cuốn Sách
+        </h3>
+        <button onclick="toggleTocDrawer()" class="text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+      <div id="toc-items-list" class="flex-1 overflow-y-auto flex flex-col gap-2"></div>
+    </div>
+    <div class="flex-1" onclick="toggleTocDrawer()"></div>
+  </div>
+
+  <!-- MODAL GIAO BÀI CHO LỚP -->
+  <div id="assign-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 text-center">
+      <div class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center mx-auto text-xl mb-3 shadow-sm">
+        <i class="fa-solid fa-paper-plane"></i>
+      </div>
+      <h3 class="text-base font-bold text-slate-900">Xác Nhận Giao Bài Tập Cho Lớp</h3>
+      <p class="text-xs text-slate-500 mt-1">Các câu hỏi đã tick chọn sẽ được phân phối tới sổ bài tập của học viên</p>
+
+      <div class="mt-4 p-3.5 bg-slate-50 rounded-xl text-left text-xs border border-slate-200 flex flex-col gap-2.5">
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">Chọn lớp học:</label>
+          <select id="modal-select-class" class="w-full p-2 bg-white border border-slate-200 rounded-lg font-medium text-xs">
+            <option>IELTS Master 6.5 - Lớp K24 (Thứ 2-4-6)</option>
+            <option>IELTS Foundation 5.0 - Lớp K25 (Thứ 3-5-7)</option>
+            <option>IELTS Intensive Writing & Reading - Lớp Chuyên Đề</option>
+          </select>
+        </div>
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">Hạn nộp bài (Deadline):</label>
+          <input type="date" id="modal-select-deadline" value="2026-10-20" class="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs">
+        </div>
+        <div class="pt-2 border-t border-slate-200 text-slate-600">
+          <div>Số câu được giao: <b id="modal-q-count" class="text-indigo-600">0</b> câu</div>
+          <div>Học liệu: <b id="modal-doc-title">Tất cả các bài</b></div>
+        </div>
+      </div>
+
+      <div class="mt-5 grid grid-cols-2 gap-2">
+        <button onclick="closeAssignModal()" class="py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl">Hủy</button>
+        <button onclick="confirmAssign()" class="py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow">Xác Nhận Giao Bài</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCRIPT LOGIC TOÀN BỘ PROTOTYPE -->
+  <script>
+    let currentPdfDoc = null;
+    let currentFile = null;
+    let extractedImages = [];
+    let parsedResult = null;
+    let currentPreviewPage = 1;
+
+    // Quản lý Đa Bài Học
+    let sectionsData = [];
+    let activeSectionIndex = 0; // Bài đang xem (0..N-1)
+    let selectedQuestionsMap = {}; // Trạng thái checkbox ở Teacher Studio
+
+    // Quản lý E-Book Reader State
+    let currentViewMode = 'ebook'; // 'ebook' hoặc 'studio'
+    let currentFontSize = 15; // px
+    let isHighlighterActive = false;
+    let userAnswers = {}; // Lưu đáp án học viên chọn trong E-Book { "secIdx_qIdx": "A" }
+
+    if (window.pdfjsLib) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+
+    // XỬ LÝ KÉO THẢ FILE
+    const dropArea = document.getElementById('drop-area');
+    ['dragenter', 'dragover'].forEach(name => {
+      dropArea.addEventListener(name, (e) => { e.preventDefault(); dropArea.classList.add('drag-active'); });
+    });
+    ['dragleave', 'drop'].forEach(name => {
+      dropArea.addEventListener(name, (e) => { e.preventDefault(); dropArea.classList.remove('drag-active'); });
+    });
+    dropArea.addEventListener('drop', (e) => {
+      const files = e.dataTransfer.files;
+      if (files.length) handleFile(files[0]);
+    });
+
+    function handleFileSelected(event) {
+      const file = event.target.files[0];
+      if (file) handleFile(file);
+    }
+
+    async function handleFile(file) {
+      if (!file.name.toLowerCase().endsWith('.pdf')) {
+        alert("Vui lòng chọn file PDF!");
+        return;
+      }
+      currentFile = file;
+      document.getElementById('loaded-file-name').innerText = file.name;
+
+      const arrayBuffer = await file.arrayBuffer();
+      currentPdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      const numPages = currentPdfDoc.numPages;
+
+      document.getElementById('loaded-file-pages').innerText = `Tổng số: ${numPages} trang (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
+      document.getElementById('page-start').value = 1;
+      document.getElementById('page-end').value = numPages;
+      document.getElementById('page-end').max = numPages;
+
+      document.getElementById('chunk-config-bar').classList.remove('hidden');
+    }
+
+    function setAllPagesScope() {
+      if (currentPdfDoc) {
+        document.getElementById('page-start').value = 1;
+        document.getElementById('page-end').value = currentPdfDoc.numPages;
+      }
+    }
+
+    // BẮT ĐẦU TRÍCH XUẤT
+    async function startProcessing() {
+      if (!currentPdfDoc) return;
+
+      const startPage = parseInt(document.getElementById('page-start').value) || 1;
+      const endPage = parseInt(document.getElementById('page-end').value) || currentPdfDoc.numPages;
+
+      document.getElementById('processing-box').classList.remove('hidden');
+      document.getElementById('studio-box').classList.add('hidden');
+      document.getElementById('ebook-container').classList.add('hidden');
+      document.getElementById('view-mode-bar').classList.add('hidden');
+      document.getElementById('image-gallery-box').classList.add('hidden');
+
+      updateProgress("Đang khởi động Mozilla PDF.js trích xuất từng trang sách...", 15);
+
+      extractedImages = [];
+      let fullText = "";
+
+      for (let pNum = startPage; pNum <= endPage; pNum++) {
+        updateProgress(`Đang bóc tách trang ${pNum}/${endPage}...`, 15 + Math.round(((pNum - startPage + 1) / (endPage - startPage + 1)) * 50));
+        const page = await currentPdfDoc.getPage(pNum);
+
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map(i => i.str).join(' ');
+        fullText += `\n--- PAGE ${pNum} ---\n` + pageText;
+
+        try {
+          const ops = await page.getOperatorList();
+          const fns = ops.fnArray;
+          const args = ops.argsArray;
+
+          for (let i = 0; i < fns.length; i++) {
+            if (fns[i] === pdfjsLib.OPS.paintImageXObject) {
+              const imgKey = args[i][0];
+              await new Promise(resolve => {
+                page.objs.get(imgKey, (imgObj) => {
+                  if (imgObj && (imgObj.width > 30 && imgObj.height > 30)) {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = Math.min(imgObj.width, 800);
+                    canvas.height = Math.min(imgObj.height, 800);
+                    const ctx = canvas.getContext('2d');
+                    
+                    const drawable = imgObj.bitmap || imgObj.image || imgObj;
+                    if (drawable) {
+                      try {
+                        ctx.drawImage(drawable, 0, 0, canvas.width, canvas.height);
+                        const dataUrl = canvas.toDataURL('image/png');
+                        const labelKey = `IMG-${String(extractedImages.length + 1).padStart(2, '0')}`;
+                        extractedImages.push({
+                          key: labelKey,
+                          pageNum: pNum,
+                          dataUrl: dataUrl,
+                          width: canvas.width,
+                          height: canvas.height
+                        });
+                      } catch(e) {}
+                    }
+                  }
+                  resolve();
+                });
+              });
+            }
+          }
+        } catch (imgErr) {}
+      }
+
+      renderImageGallery(extractedImages);
+      currentPreviewPage = startPage;
+      renderPdfPageToCanvas(startPage);
+
+      updateProgress("AI Groq 120B đang phân tích và nhận diện tất cả các bài/passage...", 75);
+
+      try {
+        const res = await fetch('/api/parse-hybrid', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: fullText,
+            images: extractedImages.map(img => ({ key: img.key, pageNum: img.pageNum })),
+            fileName: currentFile.name
+          })
+        });
+
+        const resData = await res.json();
+        updateProgress("Hoàn tất số hóa!", 100);
+
+        setTimeout(() => {
+          document.getElementById('processing-box').classList.add('hidden');
+          if (resData.success && resData.data) {
+            initializeDigitalBook(resData.data);
+          } else {
+            alert("Lỗi khi bóc tách: " + (resData.error || "Không rõ nguyên nhân"));
+          }
+        }, 500);
+
+      } catch (err) {
+        document.getElementById('processing-box').classList.add('hidden');
+        alert("Lỗi kết nối API: " + err.message);
+      }
+    }
+
+    function updateProgress(status, percent) {
+      document.getElementById('progress-status').innerText = status;
+      document.getElementById('progress-bar-fill').style.width = percent + '%';
+    }
+
+    function renderImageGallery(images) {
+      const box = document.getElementById('image-gallery-box');
+      const container = document.getElementById('extracted-images-container');
+      container.innerHTML = '';
+
+      if (images.length === 0) {
+        box.classList.add('hidden');
+        return;
+      }
+
+      document.getElementById('extracted-images-count').innerText = images.length;
+      images.forEach(img => {
+        const item = `
+          <div class="flex-shrink-0 w-28 bg-slate-50 border border-slate-200 rounded-xl p-1.5 text-center shadow-sm">
+            <div class="h-20 w-full overflow-hidden rounded-lg bg-white flex items-center justify-center mb-1">
+              <img src="${img.dataUrl}" class="max-h-full max-w-full object-contain cursor-pointer hover:scale-105 transition" onclick="window.open('${img.dataUrl}')">
+            </div>
+            <div class="text-[10px] font-bold text-slate-700">${img.key}</div>
+            <div class="text-[9px] text-slate-400">Trang ${img.pageNum}</div>
+          </div>
+        `;
+        container.insertAdjacentHTML('beforeend', item);
+      });
+      box.classList.remove('hidden');
+    }
+
+    async function renderPdfPageToCanvas(pageNumber) {
+      if (!currentPdfDoc) return;
+      document.getElementById('preview-page-indicator').innerText = `Trang ${pageNumber} / ${currentPdfDoc.numPages}`;
+      
+      const page = await currentPdfDoc.getPage(pageNumber);
+      const viewport = page.getViewport({ scale: 1.2 });
+      const canvas = document.getElementById('pdf-render-canvas');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      const ctx = canvas.getContext('2d');
+
+      await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+      canvas.classList.remove('hidden');
+      document.getElementById('pdf-render-fallback-img').classList.add('hidden');
+    }
+
+    function prevPdfPage() {
+      if (currentPreviewPage > 1) {
+        currentPreviewPage--;
+        renderPdfPageToCanvas(currentPreviewPage);
+      }
+    }
+
+    function nextPdfPage() {
+      if (currentPdfDoc && currentPreviewPage < currentPdfDoc.numPages) {
+        currentPreviewPage++;
+        renderPdfPageToCanvas(currentPreviewPage);
+      }
+    }
+
+    // ==============================================================
+    // KHỞI TẠO DỮ LIỆU CUỐN SÁCH SỐ HÓA
+    // ==============================================================
+    function initializeDigitalBook(data) {
+      parsedResult = data;
+      sectionsData = data.sections || [];
+      activeSectionIndex = 0;
+      userAnswers = {};
+
+      document.getElementById('ebook-book-title-badge').innerText = data.bookTitle || "Sách IELTS Đã Số Hóa";
+      document.getElementById('doc-book-title').innerText = data.bookTitle || "Sách IELTS Đã Số Hóa";
+      document.getElementById('badge-total-sections').innerText = `${sectionsData.length} Bài Đã Nhận Diện`;
+      document.getElementById('toc-section-count').innerText = sectionsData.length;
+
+      // Khởi tạo checkbox cho chế độ Teacher Studio
+      selectedQuestionsMap = {};
+      sectionsData.forEach((sec, sIdx) => {
+        (sec.questions || []).forEach((_, qIdx) => {
+          selectedQuestionsMap[`${sIdx}_${qIdx}`] = true;
+        });
+      });
+
+      renderSectionTabs();
+      renderTocDrawerItems();
+
+      // Hiển thị thanh chuyển đổi Mode
+      document.getElementById('view-mode-bar').classList.remove('hidden');
+
+      // Mặc định mở Chế độ E-Book Reader trước cho ấn tượng!
+      switchViewMode('ebook');
+    }
+
+    // CHUYỂN ĐỔI CHẾ ĐỘ XEM (E-BOOK vs STUDIO)
+    function switchViewMode(mode) {
+      currentViewMode = mode;
+      const btnEbook = document.getElementById('btn-mode-ebook');
+      const btnStudio = document.getElementById('btn-mode-studio');
+      const ebookBox = document.getElementById('ebook-container');
+      const studioBox = document.getElementById('studio-box');
+      const quickControls = document.getElementById('ebook-quick-controls');
+
+      if (mode === 'ebook') {
+        btnEbook.className = "flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 bg-indigo-600 text-white shadow";
+        btnStudio.className = "flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 bg-slate-100 text-slate-700 hover:bg-slate-200";
+        ebookBox.classList.remove('hidden');
+        studioBox.classList.add('hidden');
+        quickControls.classList.remove('hidden');
+        renderEbookSpread(activeSectionIndex);
+      } else {
+        btnStudio.className = "flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 bg-indigo-600 text-white shadow";
+        btnEbook.className = "flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 bg-slate-100 text-slate-700 hover:bg-slate-200";
+        studioBox.classList.remove('hidden');
+        ebookBox.classList.add('hidden');
+        quickControls.classList.add('hidden');
+        selectStudioSection(activeSectionIndex);
+      }
+    }
+
+    // ==============================================================
+    // LOGIC E-BOOK TƯƠNG TÁC (DIGITAL E-BOOK READER)
+    // ==============================================================
+    function renderEbookSpread(secIdx) {
+      if (secIdx < 0 || secIdx >= sectionsData.length) return;
+      activeSectionIndex = secIdx;
+
+      const sec = sectionsData[secIdx];
+      const pageNumLeft = (secIdx * 2) + 1;
+      const pageNumRight = (secIdx * 2) + 2;
+
+      // Cập nhật thông số trang
+      document.getElementById('ebook-page-counter').innerText = `Bài ${secIdx + 1} / ${sectionsData.length}`;
+      document.getElementById('ebook-left-page-num').innerText = `PAGE ${pageNumLeft}`;
+      document.getElementById('ebook-right-page-num').innerText = `PAGE ${pageNumRight}`;
+      document.getElementById('ebook-section-badge').innerText = `BÀI ${sec.sectionNumber || (secIdx + 1)}`;
+      document.getElementById('ebook-passage-title').innerText = sec.title || `Reading Passage ${secIdx + 1}`;
+
+      // Bài đọc trang trái
+      const passageContainer = document.getElementById('ebook-passage-content');
+      passageContainer.style.fontSize = `${currentFontSize}px`;
+      
+      // Chèn ảnh sơ đồ nếu có câu hỏi liên quan đến ảnh
+      let imagesHtml = '';
+      const associatedImgs = (sec.questions || []).map(q => q.associatedImage).filter(Boolean);
+      const uniqueImgs = [...new Set(associatedImgs)];
+
+      uniqueImgs.forEach(key => {
+        const found = extractedImages.find(img => img.key === key);
+        if (found) {
+          imagesHtml += `
+            <div class="my-4 p-3 bg-indigo-50/50 border border-indigo-200 rounded-xl text-center">
+              <img src="${found.dataUrl}" class="max-h-48 mx-auto rounded shadow bg-white">
+              <div class="text-[11px] font-bold text-indigo-700 mt-1.5"><i class="fa-solid fa-image"></i> Sơ đồ minh họa: ${key}</div>
+            </div>
+          `;
+        }
+      });
+
+      passageContainer.innerHTML = (sec.passage || "Tài liệu này không chứa bài đọc dài.") + imagesHtml;
+
+      // Câu hỏi tương tác trang phải
+      renderInteractiveQuestions(sec.questions || [], secIdx);
+
+      // Nút Trước/Tiếp
+      document.getElementById('btn-prev-page').disabled = (secIdx === 0);
+      document.getElementById('btn-next-page').disabled = (secIdx === sectionsData.length - 1);
+      document.getElementById('btn-prev-page').classList.toggle('opacity-40', secIdx === 0);
+      document.getElementById('btn-next-page').classList.toggle('opacity-40', secIdx === sectionsData.length - 1);
+
+      document.getElementById('ebook-score-pill').classList.add('hidden');
+    }
+
+    function renderInteractiveQuestions(questions, secIdx) {
+      const container = document.getElementById('ebook-interactive-questions');
+      container.innerHTML = '';
+
+      let answeredCount = 0;
+      questions.forEach((q, qIdx) => {
+        const qKey = `${secIdx}_${qIdx}`;
+        const selectedVal = userAnswers[qKey];
+        if (selectedVal) answeredCount++;
+
+        let optionsHtml = '';
+        if (q.options && q.options.length) {
+          optionsHtml = `
+            <div class="mt-2.5 flex flex-col gap-1.5">
+              ${q.options.map(opt => {
+                const optLetter = opt.trim().slice(0, 1).toUpperCase();
+                const isSelected = (selectedVal === optLetter);
+                return `
+                  <button onclick="selectEbookOption(${secIdx}, ${qIdx}, '${optLetter}')" 
+                    id="opt_${secIdx}_${qIdx}_${optLetter}"
+                    class="ebook-opt-btn p-2.5 rounded-xl border text-left text-xs font-medium transition flex items-center gap-2.5 ${isSelected ? 'bg-indigo-600 text-white border-indigo-600 font-bold shadow' : 'bg-white hover:bg-indigo-50/50 border-slate-200 text-slate-700'}">
+                    <span class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black ${isSelected ? 'bg-white text-indigo-700' : 'bg-slate-100 text-slate-700'}">
+                      ${optLetter}
+                    </span>
+                    <span class="flex-1">${opt}</span>
+                  </button>
+                `;
+              }).join('')}
+            </div>
+          `;
+        }
+
+        const card = `
+          <div id="q_card_${secIdx}_${qIdx}" class="p-4 bg-white rounded-2xl border border-slate-200 shadow-sm transition">
+            <div class="flex items-center justify-between text-xs mb-1.5">
+              <span class="font-black text-slate-900 text-sm">Câu ${q.number || (qIdx + 1)}</span>
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-100">${q.type || 'TRẮC NGHIỆM'}</span>
+            </div>
+            <p class="text-xs font-semibold text-slate-800 leading-relaxed">${q.content}</p>
+            ${optionsHtml}
+            <div id="q_feedback_${secIdx}_${qIdx}" class="mt-2 text-xs font-bold hidden"></div>
+          </div>
+        `;
+        container.insertAdjacentHTML('beforeend', card);
+      });
+
+      document.getElementById('ebook-quiz-counter').innerText = `${answeredCount}/${questions.length} Đã Làm`;
+    }
+
+    function selectEbookOption(secIdx, qIdx, letter) {
+      const qKey = `${secIdx}_${qIdx}`;
+      userAnswers[qKey] = letter;
+      renderInteractiveQuestions(sectionsData[secIdx].questions || [], secIdx);
+    }
+
+    function resetEbookAnswers() {
+      const sec = sectionsData[activeSectionIndex];
+      (sec.questions || []).forEach((_, qIdx) => {
+        delete userAnswers[`${activeSectionIndex}_${qIdx}`];
+      });
+      renderInteractiveQuestions(sec.questions || [], activeSectionIndex);
+      document.getElementById('ebook-score-pill').classList.add('hidden');
+    }
+
+    // CHẤM ĐIỂM BÀI TẬP E-BOOK TRỰC TIẾP TRÊN TRANG SÁCH
+    function checkEbookAnswers() {
+      const sec = sectionsData[activeSectionIndex];
+      const questions = sec.questions || [];
+      let correctCount = 0;
+      let totalCount = questions.length;
+
+      questions.forEach((q, qIdx) => {
+        const qKey = `${activeSectionIndex}_${qIdx}`;
+        const userChoice = userAnswers[qKey];
+        const rawKey = (q.correctKey || "").trim().slice(0, 1).toUpperCase();
+
+        const card = document.getElementById(`q_card_${activeSectionIndex}_${qIdx}`);
+        const feedback = document.getElementById(`q_feedback_${activeSectionIndex}_${qIdx}`);
+
+        if (!rawKey) {
+          // Không có key để chấm
+          return;
+        }
+
+        if (userChoice === rawKey) {
+          correctCount++;
+          card.classList.add('border-emerald-500', 'bg-emerald-50/20');
+          feedback.className = "mt-2 text-xs font-bold text-emerald-700 flex items-center gap-1";
+          feedback.innerHTML = `<i class="fa-solid fa-circle-check"></i> Chính xác! Đáp án: ${rawKey}`;
+          feedback.classList.remove('hidden');
+        } else {
+          card.classList.add('border-rose-400', 'bg-rose-50/20');
+          feedback.className = "mt-2 text-xs font-bold text-rose-700 flex items-center gap-1";
+          feedback.innerHTML = `<i class="fa-solid fa-circle-xmark"></i> Sai rồi! Đáp án chuẩn: <b>${rawKey}</b> (Bạn chọn: ${userChoice || 'Chưa chọn'})`;
+          feedback.classList.remove('hidden');
+
+          // Highlight ô đáp án đúng
+          const correctBtn = document.getElementById(`opt_${activeSectionIndex}_${qIdx}_${rawKey}`);
+          if (correctBtn) {
+            correctBtn.classList.add('border-emerald-500', 'ring-2', 'ring-emerald-400');
+          }
+        }
+      });
+
+      const percent = Math.round((correctCount / totalCount) * 100);
+      const scorePill = document.getElementById('ebook-score-pill');
+      scorePill.innerText = `Điểm: ${correctCount}/${totalCount} (${percent}%)`;
+      scorePill.classList.remove('hidden');
+
+      alert(`📊 Kết Quả Bài ${activeSectionIndex + 1}:\n\nBạn đạt: ${correctCount} / ${totalCount} câu đúng (${percent}%)\nĐáp án chi tiết đã được tô màu xanh/đỏ ngay trên trang sách!`);
+    }
+
+    function prevEbookSection() {
+      if (activeSectionIndex > 0) {
+        renderEbookSpread(activeSectionIndex - 1);
+      }
+    }
+
+    function nextEbookSection() {
+      if (activeSectionIndex < sectionsData.length - 1) {
+        renderEbookSpread(activeSectionIndex + 1);
+      }
+    }
+
+    // ĐỔI MÀU GIẤY E-BOOK
+    function setEbookTheme(theme) {
+      const spread = document.getElementById('ebook-spread');
+      spread.className = `ebook-theme-${theme} rounded-3xl border shadow-2xl overflow-hidden grid grid-cols-1 lg:grid-cols-2 min-h-[640px] relative transition-colors duration-300`;
+    }
+
+    // ĐỔI CỠ CHỮ
+    function changeFontSize(delta) {
+      currentFontSize = Math.max(12, Math.min(22, currentFontSize + delta));
+      document.getElementById('ebook-passage-content').style.fontSize = `${currentFontSize}px`;
+    }
+
+    // BẬT BÚT DẠ QUANG HIGHLIGHT
+    function toggleHighlighter() {
+      isHighlighterActive = !isHighlighterActive;
+      const btn = document.getElementById('btn-highlighter');
+      const passage = document.getElementById('ebook-passage-content');
+
+      if (isHighlighterActive) {
+        btn.className = "px-2.5 py-1 bg-amber-400 text-amber-950 font-black border border-amber-500 rounded-xl flex items-center gap-1.5 shadow-md";
+        passage.classList.add('highlight-active');
+        alert("🖍️ Đã BẬT Bút Dạ Quang Highlight!\n\nHãy dùng chuột quét bôi đen bất kỳ đoạn văn bản nào trong bài đọc để đánh dấu dẫn chứng.");
+      } else {
+        btn.className = "px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl font-bold flex items-center gap-1.5 transition";
+        passage.classList.remove('highlight-active');
+      }
+    }
+
+    // DRAWER MỤC LỤC
+    function toggleTocDrawer() {
+      document.getElementById('toc-drawer').classList.toggle('hidden');
+    }
+
+    function renderTocDrawerItems() {
+      const container = document.getElementById('toc-items-list');
+      container.innerHTML = '';
+
+      sectionsData.forEach((sec, idx) => {
+        const item = document.createElement('button');
+        item.className = "w-full text-left p-3 rounded-xl border border-slate-100 hover:border-indigo-200 hover:bg-indigo-50/50 transition flex items-center justify-between";
+        item.innerHTML = `
+          <div>
+            <div class="text-[10px] font-black text-indigo-600 uppercase">Bài ${sec.sectionNumber || (idx + 1)}</div>
+            <div class="text-xs font-bold text-slate-800 line-clamp-1">${sec.title}</div>
+          </div>
+          <span class="text-[11px] font-bold text-slate-400">${(sec.questions || []).length} câu</span>
+        `;
+        item.onclick = () => {
+          toggleTocDrawer();
+          if (currentViewMode === 'ebook') {
+            renderEbookSpread(idx);
+          } else {
+            selectStudioSection(idx);
+          }
+        };
+        container.appendChild(item);
+      });
+    }
+
+    // ==============================================================
+    // LOGIC CHẾ ĐỘ STUDIO QUẢN TRỊ (TEACHER VIEW)
+    // ==============================================================
+    function renderSectionTabs() {
+      const container = document.getElementById('section-tabs-container');
+      container.innerHTML = '';
+
+      const allBtn = document.createElement('button');
+      allBtn.className = `px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${activeSectionIndex === -1 ? 'bg-indigo-600 text-white shadow' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`;
+      allBtn.innerHTML = `<i class="fa-solid fa-list-ul"></i> Tất Cả Các Bài (${parsedResult?.totalQuestions || 0} câu)`;
+      allBtn.onclick = () => selectStudioSection(-1);
+      container.appendChild(allBtn);
+
+      sectionsData.forEach((sec, idx) => {
+        const btn = document.createElement('button');
+        const isCurrent = (activeSectionIndex === idx);
+        btn.className = `px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${isCurrent ? 'bg-indigo-600 text-white shadow' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`;
+        btn.innerHTML = `<i class="fa-solid fa-book-open"></i> Bài ${sec.sectionNumber || (idx + 1)}: ${sec.title.slice(0, 20)}... (${(sec.questions || []).length} câu)`;
+        btn.onclick = () => selectStudioSection(idx);
+        container.appendChild(btn);
+      });
+    }
+
+    function selectStudioSection(idx) {
+      activeSectionIndex = idx;
+      renderSectionTabs();
+
+      const questionsContainer = document.getElementById('questions-container');
+      questionsContainer.innerHTML = '';
+
+      if (idx === -1) {
+        document.getElementById('active-section-tag').innerText = "TỔNG HỢP";
+        document.getElementById('active-section-title').innerText = `Toàn bộ ${sectionsData.length} bài học trong tài liệu`;
+        
+        let allPassagesText = "";
+        sectionsData.forEach((sec, sIdx) => {
+          allPassagesText += `=== BÀI ${sec.sectionNumber || (sIdx + 1)}: ${sec.title} ===\n${sec.passage}\n\n`;
+          renderTeacherQuestionsList(sec.questions || [], sIdx, questionsContainer);
+        });
+
+        document.getElementById('passage-text').innerText = allPassagesText || "Tài liệu này không có bài đọc.";
+        document.getElementById('passage-container').classList.remove('hidden');
+
+      } else {
+        const currentSec = sectionsData[idx];
+        document.getElementById('active-section-tag').innerText = `BÀI ${currentSec.sectionNumber || (idx + 1)}`;
+        document.getElementById('active-section-title').innerText = currentSec.title || `Bài học ${idx + 1}`;
+        
+        if (currentSec.passage) {
+          document.getElementById('passage-text').innerText = currentSec.passage;
+          document.getElementById('passage-container').classList.remove('hidden');
+        } else {
+          document.getElementById('passage-container').classList.add('hidden');
+        }
+
+        renderTeacherQuestionsList(currentSec.questions || [], idx, questionsContainer);
+      }
+
+      updateTeacherCounter();
+    }
+
+    function renderTeacherQuestionsList(questions, sIdx, container) {
+      questions.forEach((q, qIdx) => {
+        const isChecked = selectedQuestionsMap[`${sIdx}_${qIdx}`] !== false;
+
+        let optionsHtml = '';
+        if (q.options && q.options.length) {
+          optionsHtml = `
+            <div class="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+              ${q.options.map(opt => `
+                <div class="px-2.5 py-1.5 bg-white rounded-lg border border-slate-200 text-slate-700 font-medium text-[11px] flex items-center gap-1.5">
+                  <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                  ${opt}
+                </div>
+              `).join('')}
+            </div>
+          `;
+        }
+
+        const card = `
+          <div class="p-3.5 bg-slate-50 hover:bg-indigo-50/20 rounded-xl border border-slate-200 transition flex items-start gap-3">
+            <input type="checkbox" id="chk_${sIdx}_${qIdx}" ${isChecked ? 'checked' : ''} onchange="toggleTeacherCheckbox(${sIdx}, ${qIdx})" class="mt-1 w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer">
+            <div class="flex-1 text-xs">
+              <div class="flex items-center gap-2">
+                <span class="font-black text-slate-900 text-sm">Câu ${q.number || (qIdx + 1)}</span>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-100 text-indigo-700">${q.type || 'TRẮC NGHIỆM'}</span>
+                ${q.correctKey ? `<span class="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded">Đáp án: ${q.correctKey}</span>` : ''}
+                <span class="text-[9px] text-slate-400 ml-auto">Bài ${sIdx + 1}</span>
+              </div>
+              <p class="text-slate-800 font-medium mt-1.5 leading-relaxed">${q.content}</p>
+              ${optionsHtml}
+            </div>
+          </div>
+        `;
+        container.insertAdjacentHTML('beforeend', card);
+      });
+    }
+
+    function toggleTeacherCheckbox(sIdx, qIdx) {
+      const chk = document.getElementById(`chk_${sIdx}_${qIdx}`);
+      if (chk) {
+        selectedQuestionsMap[`${sIdx}_${qIdx}`] = chk.checked;
+        updateTeacherCounter();
+      }
+    }
+
+    function updateTeacherCounter() {
+      let selectedCount = 0;
+      let totalQuestions = 0;
+
+      sectionsData.forEach((sec, sIdx) => {
+        (sec.questions || []).forEach((_, qIdx) => {
+          totalQuestions++;
+          if (selectedQuestionsMap[`${sIdx}_${qIdx}`]) selectedCount++;
+        });
+      });
+
+      document.getElementById('selected-counter').innerText = selectedCount;
+      document.getElementById('total-counter').innerText = totalQuestions;
+    }
+
+    function toggleSelectActiveSection() {
+      const isSelectingAll = document.getElementById('btn-select-section').innerText.includes("Chọn tất cả");
+      
+      if (activeSectionIndex === -1) {
+        sectionsData.forEach((sec, sIdx) => {
+          (sec.questions || []).forEach((_, qIdx) => {
+            selectedQuestionsMap[`${sIdx}_${qIdx}`] = isSelectingAll;
+            const chk = document.getElementById(`chk_${sIdx}_${qIdx}`);
+            if (chk) chk.checked = isSelectingAll;
+          });
+        });
+      } else {
+        const sec = sectionsData[activeSectionIndex];
+        (sec.questions || []).forEach((_, qIdx) => {
+          selectedQuestionsMap[`${activeSectionIndex}_${qIdx}`] = isSelectingAll;
+          const chk = document.getElementById(`chk_${activeSectionIndex}_${qIdx}`);
+          if (chk) chk.checked = isSelectingAll;
+        });
+      }
+
+      document.getElementById('btn-select-section').innerText = isSelectingAll ? "Bỏ chọn bài này" : "Chọn tất cả bài này";
+      updateTeacherCounter();
+    }
+
+    function togglePassageCollapse() {
+      const text = document.getElementById('passage-text');
+      const btn = document.getElementById('btn-toggle-passage');
+      if (text.classList.contains('max-h-48')) {
+        text.classList.remove('max-h-48');
+        btn.innerText = "Thu gọn";
+      } else {
+        text.classList.add('max-h-48');
+        btn.innerText = "Xem đầy đủ";
+      }
+    }
+
+    // XUẤT FILE WORD
+    async function exportDocx() {
+      if (!parsedResult) return;
+      if (!window.docx) {
+        alert("Thư viện Docx đang nạp, vui lòng thử lại sau giây lát!");
+        return;
+      }
+
+      const { Document, Packer, Paragraph, TextRun, HeadingLevel } = window.docx;
+
+      const children = [
+        new Paragraph({
+          text: parsedResult.bookTitle || "SIMPACE IELTS Practice Material",
+          heading: HeadingLevel.TITLE
+        }),
+        new Paragraph({
+          text: `Tổng hợp ${sectionsData.length} bài học và đề thi đã số hóa`,
+          heading: HeadingLevel.HEADING_2
+        }),
+        new Paragraph({ text: "" })
+      ];
+
+      sectionsData.forEach((sec, sIdx) => {
+        children.push(
+          new Paragraph({
+            text: `SECTION ${sec.sectionNumber || (sIdx + 1)}: ${sec.title}`,
+            heading: HeadingLevel.HEADING_2
+          }),
+          new Paragraph({ text: "" }),
+          new Paragraph({
+            text: "READING PASSAGE:",
+            heading: HeadingLevel.HEADING_3
+          }),
+          new Paragraph({
+            text: sec.passage || "(Không có bài đọc)"
+          }),
+          new Paragraph({ text: "" }),
+          new Paragraph({
+            text: "QUESTIONS & ANSWER KEYS:",
+            heading: HeadingLevel.HEADING_3
+          })
+        );
+
+        (sec.questions || []).forEach((q, qIdx) => {
+          children.push(
+            new Paragraph({
+              children: [
+                new TextRun({ text: `Question ${q.number || (qIdx + 1)} (${q.type}): `, bold: true }),
+                new TextRun({ text: q.content }),
+                new TextRun({ text: q.options ? ` [Options: ${q.options.join(', ')}]` : "" }),
+                new TextRun({ text: q.correctKey ? ` --> Key: ${q.correctKey}` : "", color: "2E7D32", bold: true })
+              ]
+            })
+          );
+        });
+
+        children.push(new Paragraph({ text: "" }));
+      });
+
+      const doc = new Document({
+        sections: [{ properties: {}, children: children }]
+      });
+
+      const blob = await Packer.toBlob(doc);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${(parsedResult.bookTitle || "IELTS_Multi_Test").replace(/\s+/g, '_')}_SIMPACE.docx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    // MODAL GIAO BÀI TẬP
+    function openAssignModal() {
+      let selectedCount = 0;
+      sectionsData.forEach((sec, sIdx) => {
+        (sec.questions || []).forEach((_, qIdx) => {
+          if (selectedQuestionsMap[`${sIdx}_${qIdx}`]) selectedCount++;
+        });
+      });
+
+      if (selectedCount === 0) {
+        alert("Vui lòng tick chọn ít nhất 1 câu hỏi để giao bài!");
+        return;
+      }
+
+      document.getElementById('modal-q-count').innerText = selectedCount;
+      const targetTitle = (activeSectionIndex === -1) 
+        ? `Toàn bộ ${sectionsData.length} bài thi` 
+        : `Bài ${activeSectionIndex + 1}: ${sectionsData[activeSectionIndex].title}`;
+      document.getElementById('modal-doc-title').innerText = targetTitle;
+      document.getElementById('assign-modal').classList.remove('hidden');
+    }
+
+    function closeAssignModal() {
+      document.getElementById('assign-modal').classList.add('hidden');
+    }
+
+    function confirmAssign() {
+      const cls = document.getElementById('modal-select-class').value;
+      const dl = document.getElementById('modal-select-deadline').value;
+      const count = document.getElementById('modal-q-count').innerText;
+      closeAssignModal();
+      alert(`🎉 Giao bài thành công!\n\nĐã phân phối ${count} câu hỏi đã số hóa tới: ${cls}\nHạn nộp: ${dl}`);
+    }
+
+    // MẪU ĐỀ IELTS 3 BÀI ĐỌC
+    function loadSampleIeltsMulti() {
+      extractedImages = [
+        {
+          key: "IMG-01",
+          pageNum: 1,
+          dataUrl: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='200' viewBox='0 0 300 200'><rect width='300' height='200' fill='%23e0e7ff'/><text x='150' y='40' font-family='sans-serif' font-size='14' font-weight='bold' text-anchor='middle' fill='%233730a3'>HYDROELECTRIC DAM</text><path d='M50 160 L120 70 L200 70 L260 160 Z' fill='%2394a3b8'/><rect x='130' y='110' width='40' height='50' fill='%233b82f6'/><text x='150' y='140' font-size='11' text-anchor='middle' fill='white'>Turbine</text></svg>"
+        }
+      ];
+      renderImageGallery(extractedImages);
+
+      const sample = {
+        bookTitle: "Cambridge IELTS 18 Academic - Reading Full Test",
+        totalQuestions: 9,
+        sections: [
+          {
+            sectionNumber: 1,
+            title: "Passage 1: Renewable Hydroelectric Systems",
+            passage: "Hydroelectric power plants harness the kinetic energy of flowing water to generate electricity without burning fossil fuels.\n\nA typical conventional installation consists of an elevated reservoir that stores water behind a reinforced concrete dam. When electricity demand spikes, control gates open to channel water through penstock pipes into high-velocity turbines.\n\nThe mechanical rotational energy created by the turbines spins electric generators, which produce alternating current before passing through step-up transformers into regional power grids.",
+            questions: [
+              {
+                number: 1,
+                type: "DIAGRAM_COMPLETION",
+                content: "What component spins the electric generator in the dam diagram?",
+                options: ["A. Turbine shaft", "B. Reservoir spillway", "C. Control gate", "D. Intake valve"],
+                correctKey: "A",
+                associatedImage: "IMG-01"
+              },
+              {
+                number: 2,
+                type: "TRUE_FALSE_NOT_GIVEN",
+                content: "Hydroelectric stations release massive carbon emissions during daily operations.",
+                options: ["TRUE", "FALSE", "NOT GIVEN"],
+                correctKey: "FALSE"
+              },
+              {
+                number: 3,
+                type: "MULTIPLE_CHOICE",
+                content: "When are the control gates primarily opened?",
+                options: ["A. During routine maintenance", "B. When power demand spikes sharply", "C. In dry seasons", "D. In winter"],
+                correctKey: "B"
+              }
+            ]
+          },
+          {
+            sectionNumber: 2,
+            title: "Passage 2: The History of Space Exploration",
+            passage: "The mid-twentieth century witnessed unprecedented competition between global superpowers to conquer outer space.\n\nBeginning with artificial satellite launches in 1957, rapid aerospace developments enabled crewed lunar landings by 1969. Proponents argue that the astronomical expenditure drove radical breakthroughs in telecommunications, computing architectures, and composite materials.\n\nHowever, contemporary critics debated whether public finances should have been prioritized for pressing terrestrial challenges such as poverty eradication and ecological conservation.",
+            questions: [
+              {
+                number: 4,
+                type: "MULTIPLE_CHOICE",
+                content: "Which year marked the first artificial satellite launch?",
+                options: ["A. 1957", "B. 1961", "C. 1969", "D. 1972"],
+                correctKey: "A"
+              },
+              {
+                number: 5,
+                type: "TRUE_FALSE_NOT_GIVEN",
+                content: "Space exploration technology yielded zero commercial applications.",
+                options: ["TRUE", "FALSE", "NOT GIVEN"],
+                correctKey: "FALSE"
+              },
+              {
+                number: 6,
+                type: "MULTIPLE_CHOICE",
+                content: "What landmark milestone was accomplished in 1969?",
+                options: ["A. Satellite communication", "B. Crewed lunar landing", "C. Deep space probe", "D. Space station"],
+                correctKey: "B"
+              }
+            ]
+          },
+          {
+            sectionNumber: 3,
+            title: "Passage 3: Artificial Intelligence in Modern Healthcare",
+            passage: "Machine learning algorithms have demonstrated diagnostic accuracy comparable to experienced medical specialists in radiology and pathology.\n\nBy processing millions of annotated radiographic scans, neural networks identify subtle oncology markers far earlier than human clinicians.\n\nNevertheless, ethical considerations regarding algorithmic bias, patient data sovereignty, and explainability remain paramount regulatory hurdles across international health authorities.",
+            questions: [
+              {
+                number: 7,
+                type: "MULTIPLE_CHOICE",
+                content: "In which medical fields have ML models demonstrated high diagnostic accuracy?",
+                options: ["A. Radiology and Pathology", "B. General Surgery", "C. Dentistry", "D. Pharmacy"],
+                correctKey: "A"
+              },
+              {
+                number: 8,
+                type: "TRUE_FALSE_NOT_GIVEN",
+                content: "Algorithms in healthcare operate without any ethical considerations.",
+                options: ["TRUE", "FALSE", "NOT GIVEN"],
+                correctKey: "FALSE"
+              },
+              {
+                number: 9,
+                type: "MULTIPLE_CHOICE",
+                content: "What is mentioned as a major remaining hurdle for medical AI?",
+                options: ["A. High computational cost", "B. Explainability and patient data sovereignty", "C. Lack of medical data", "D. Hardware shortage"],
+                correctKey: "B"
+              }
+            ]
+          }
+        ]
+      };
+
+      document.getElementById('pdf-render-canvas').classList.add('hidden');
+      const fallback = document.getElementById('pdf-render-fallback-img');
+      fallback.src = extractedImages[0].dataUrl;
+      fallback.classList.remove('hidden');
+      document.getElementById('preview-page-indicator').innerText = "Trang 1 / 3 (Mẫu Đa Bài)";
+
+      initializeDigitalBook(sample);
+    }
+
+    // MẪU NGỮ PHÁP 2 UNIT
+    function loadSampleGrammar() {
+      extractedImages = [];
+      renderImageGallery(extractedImages);
+
+      const sample = {
+        bookTitle: "Grammar for IELTS with Answers (Cambridge)",
+        totalQuestions: 4,
+        sections: [
+          {
+            sectionNumber: 1,
+            title: "Unit 1: Present Perfect vs Past Simple",
+            passage: "Use Past Simple for completed actions in the past with a specific time.\nUse Present Perfect for experiences or actions with a present result.",
+            questions: [
+              {
+                number: 1,
+                type: "MULTIPLE_CHOICE",
+                content: "She _______ in Hanoi since 2018.",
+                options: ["A. lived", "B. has lived", "C. is living", "D. lives"],
+                correctKey: "B"
+              },
+              {
+                number: 2,
+                type: "MULTIPLE_CHOICE",
+                content: "They _______ the thesis proposal yesterday.",
+                options: ["A. submitted", "B. have submitted", "C. had submitted", "D. submit"],
+                correctKey: "A"
+              }
+            ]
+          },
+          {
+            sectionNumber: 2,
+            title: "Unit 2: Conditionals & Unreal Situations",
+            passage: "Type 2: Unreal situations in present (If + Past Simple, would + V).\nType 3: Unreal situations in past (If + Past Perfect, would have + V3).",
+            questions: [
+              {
+                number: 3,
+                type: "MULTIPLE_CHOICE",
+                content: "If I _______ you, I would consult the academic supervisor.",
+                options: ["A. was", "B. were", "C. am", "D. will be"],
+                correctKey: "B"
+              },
+              {
+                number: 4,
+                type: "MULTIPLE_CHOICE",
+                content: "Had she arrived on time, she _______ the opportunity.",
+                options: ["A. wouldn't miss", "B. wouldn't have missed", "C. hadn't missed", "D. won't miss"],
+                correctKey: "B"
+              }
+            ]
+          }
+        ]
+      };
+
+      document.getElementById('pdf-render-canvas').classList.add('hidden');
+      document.getElementById('pdf-render-fallback-img').classList.remove('hidden');
+      document.getElementById('pdf-render-fallback-img').src = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='400' viewBox='0 0 300 400'><rect width='300' height='400' fill='%23f8fafc'/><text x='150' y='50' font-family='sans-serif' font-size='14' font-weight='bold' text-anchor='middle' fill='%230f172a'>Grammar Units</text></svg>";
+      document.getElementById('preview-page-indicator').innerText = "Ngữ pháp 2 Unit (Mẫu)";
+
+      initializeDigitalBook(sample);
+    }
+  </script>
+</body>
+</html>

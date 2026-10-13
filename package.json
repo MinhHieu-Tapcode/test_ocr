@@ -1,0 +1,22 @@
+{
+  "name": "simpace-smart-ingestion-ebook",
+  "version": "1.0.0",
+  "description": "SIMPACE Smart E-Book & Exercise Ingestion Prototype - KLTN 2026",
+  "type": "module",
+  "main": "server.mjs",
+  "scripts": {
+    "start": "node server.mjs",
+    "dev": "node server.mjs"
+  },
+  "keywords": [
+    "ielts",
+    "ocr",
+    "ebook",
+    "lms",
+    "pdf-js",
+    "groq-lpu",
+    "simpace"
+  ],
+  "author": "MinhHieu-Tapcode",
+  "license": "MIT"
+}
